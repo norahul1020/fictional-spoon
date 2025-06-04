@@ -17,7 +17,7 @@ jobs:
       run: |
         cat > tenable_was.conf << 'EOF'
         # "config_id"="basic-auth-simple-test"
-        "template_id"="web-app-scan"
+        # "template_id"="web-app-scan"
         "results_visibility"=dashboard
         "vulnerability_threshold"="Medium"
         

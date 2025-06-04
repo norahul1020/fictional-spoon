@@ -1,0 +1,56 @@
+name: 🔐 Basic Auth Test Only
+
+on:
+  workflow_dispatch:
+
+env:
+  TENABLE_ACCESS_KEY: ${{ secrets.TENABLE_ACCESS_KEY }}
+  TENABLE_SECRET_KEY: ${{ secrets.TENABLE_SECRET_KEY }}
+
+jobs:
+  basic-auth-test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: 🔍 Run Basic Auth Scan
+      run: |
+        cat > tenable_was.conf << 'EOF'
+        "config_id"="basic-auth-simple-test"
+        "template_id"="web-app-scan"
+        "results_visibility"=dashboard
+        "vulnerability_threshold"="Medium"
+        
+        scan {
+          assessment { enable=true }
+          audit { headers=true links=true }
+          http { "request_timeout"=30 }
+          scope { "page_limit"=50 }
+          timeout="00:20:00"
+          
+          credentials {
+            "basic_auth" {
+              "username"="testuser"
+              "password"="testpass123"
+            }
+          }
+        }
+        
+        target="https://httpbin.org/basic-auth/testuser/testpass123"
+        EOF
+        
+        docker run \
+          -v $(pwd):/scanner \
+          -e WAS_MODE=cicd \
+          -e ACCESS_KEY="${{ env.TENABLE_ACCESS_KEY }}" \
+          -e SECRET_KEY="${{ env.TENABLE_SECRET_KEY }}" \
+          tenable/was-scanner:latest || true
+          
+    - name: 📤 Upload Results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: basic-auth-simple-results
+        path: |
+          tenable_was_scan.html
+          scanner.log

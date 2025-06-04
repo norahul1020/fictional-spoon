@@ -1,0 +1,70 @@
+name: 📝 Form Auth Test Only
+
+on:
+  workflow_dispatch:
+
+env:
+  TENABLE_ACCESS_KEY: ${{ secrets.TENABLE_ACCESS_KEY }}
+  TENABLE_SECRET_KEY: ${{ secrets.TENABLE_SECRET_KEY }}
+
+jobs:
+  form-auth-test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: �� Deploy DVWA
+      run: |
+        docker run -d --name dvwa -p 8080:80 vulnerables/web-dvwa:latest
+        sleep 30
+        curl -X POST http://localhost:8080/setup.php -d "create_db=Create / Reset Database" || true
+        sleep 10
+    
+    - name: 🔍 Run Form Auth Scan
+      run: |
+        cat > tenable_was.conf << 'EOF'
+        "config_id"="form-auth-simple-test"
+        "template_id"="web-app-scan"
+        "results_visibility"=dashboard
+        "vulnerability_threshold"="Medium"
+        
+        scan {
+          assessment { enable=true }
+          audit { forms=true cookies=true }
+          http { "request_timeout"=45 }
+          scope { "page_limit"=100 }
+          timeout="00:30:00"
+          
+          credentials {
+            "login_form" {
+              "login_url"="http://localhost:8080/login.php"
+              "login_parameters"={
+                "username": "admin"
+                "password": "password"
+                "Login": "Login"
+              }
+              "login_check"="Welcome"
+              "login_check_url"="http://localhost:8080/index.php"
+            }
+          }
+        }
+        
+        target="http://localhost:8080/"
+        EOF
+        
+        docker run \
+          -v $(pwd):/scanner \
+          --network host \
+          -e WAS_MODE=cicd \
+          -e ACCESS_KEY="${{ env.TENABLE_ACCESS_KEY }}" \
+          -e SECRET_KEY="${{ env.TENABLE_SECRET_KEY }}" \
+          tenable/was-scanner:latest || true
+          
+    - name: 📤 Upload Results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: form-auth-simple-results
+        path: |
+          tenable_was_scan.html
+          scanner.log

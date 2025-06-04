@@ -1,0 +1,24 @@
+version: '3.8'
+
+services:
+  dvwa:
+    image: vulnerables/web-dvwa:latest
+    ports:
+      - "8080:80"
+    environment:
+      - MYSQL_DATABASE=dvwa
+      - MYSQL_USER=dvwa
+      - MYSQL_PASSWORD=p@ssw0rd
+    restart: unless-stopped
+    
+  nginx-basic-auth:
+    build: ./nginx-basic-auth
+    ports:
+      - "8081:80"
+    restart: unless-stopped
+    
+  simple-login-app:
+    build: ./simple-login-app
+    ports:
+      - "5000:5000"
+    restart: unless-stopped

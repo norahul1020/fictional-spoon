@@ -1,0 +1,30 @@
+# Environment files
+.env
+*.env.local
+
+# Scan results
+results/
+*.html
+*.log
+tenable_was.conf
+scanner.log
+tenable_was_scan.html
+
+# Docker
+.docker/
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Temporary files
+*.tmp
+temp/

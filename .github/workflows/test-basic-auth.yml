@@ -15,9 +15,20 @@ jobs:
     
     - name: 🔍 Run Basic Auth Scan
       run: |
-        cat > tenable_was.conf << 'EOF'
-        # "config_id"="basic-auth-simple-test"
-        # "template_id"="web-app-scan"
+        echo "🚀 Running Basic Authentication scan with proper UUID..."
+        
+        # Generate a proper UUID
+        CONFIG_UUID=$(uuidgen)
+        echo "Generated UUID: $CONFIG_UUID"
+
+        # Generate a proper UUID
+        TEMPLATE_UUID=$(uuidgen)
+        echo "Generated TEMPLATE UUID: $TEMPLATE_UUID"        
+        
+        # Create configuration with proper UUID
+        cat > tenable_was.conf << EOF
+        "config_id"="$CONFIG_UUID"
+        "template_id"="$TEMPLATE_UUID"
         "results_visibility"=dashboard
         "vulnerability_threshold"="Medium"
         

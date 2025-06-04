@@ -166,4 +166,4 @@ Your POC is successful when:
 
 ---
 
-**Ready to secure your applications? Start with the Basic Auth test and expand from there!** 🚀
+**Ready to secure your applications? Start with the Basic Auth test and expand from there! Hooreeyyyy** 🚀

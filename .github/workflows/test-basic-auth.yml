@@ -13,55 +13,54 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     
+    - name: 🧪 Test HTTPBin Basic Auth Endpoint
+      run: |
+        echo "🔍 Testing HTTPBin Basic Auth endpoint..."
+        response=$(curl -s -u testuser:testpass123 https://httpbin.org/basic-auth/testuser/testpass123)
+        if echo "$response" | jq -r '.authenticated' | grep -q "true"; then
+          echo "✅ HTTPBin Basic Auth endpoint working"
+        else
+          echo "❌ HTTPBin Basic Auth endpoint failed"
+          exit 1
+        fi
+    
     - name: 🔍 Run Basic Auth Scan
       run: |
-        echo "🚀 Running Basic Authentication scan with proper UUID..."
+        echo "🚀 Running Basic Authentication scan using config/basic-auth.conf..."
         
-        # Generate a proper UUID
-        CONFIG_UUID=$(uuidgen)
-        echo "Generated UUID: $CONFIG_UUID"
-
-        # Generate a proper UUID
-        TEMPLATE_UUID=$(uuidgen)
-        echo "Generated TEMPLATE UUID: $TEMPLATE_UUID"        
+        # Use the separate configuration file
+        cp config/basic-auth.conf tenable_was.conf
         
-        # Create configuration with proper UUID
-        cat > tenable_was.conf << EOF
-        "config_id"="$CONFIG_UUID"
-        "template_id"="$TEMPLATE_UUID"
-        "results_visibility"=dashboard
-        "vulnerability_threshold"="Medium"
+        echo "📋 Configuration file content:"
+        cat tenable_was.conf
         
-        scan {
-          assessment { enable=true }
-          audit { headers=true links=true }
-          http { "request_timeout"=30 }
-          scope { "page_limit"=50 }
-          timeout="00:20:00"
-          
-          credentials {
-            "basic_auth" {
-              "username"="testuser"
-              "password"="testpass123"
-            }
-          }
-        }
-        
-        target="https://httpbin.org/basic-auth/testuser/testpass123"
-        EOF
-        
+        # Run the scan
+        docker pull tenable/was-scanner:latest
         docker run \
+          --name tenable-basic-auth \
           -v $(pwd):/scanner \
           -e WAS_MODE=cicd \
           -e ACCESS_KEY="${{ env.TENABLE_ACCESS_KEY }}" \
           -e SECRET_KEY="${{ env.TENABLE_SECRET_KEY }}" \
           tenable/was-scanner:latest || true
+        
+        # Show results
+        if [[ -f "tenable_was_scan.html" ]]; then
+          echo "✅ Scan completed - HTML report generated"
+          ls -la tenable_was_scan.html
+        fi
+        
+        if [[ -f "scanner.log" ]]; then
+          echo "📋 Scanner log (last 30 lines):"
+          tail -30 scanner.log
+        fi
           
     - name: 📤 Upload Results
       uses: actions/upload-artifact@v4
       if: always()
       with:
-        name: basic-auth-simple-results
+        name: basic-auth-simple-results-${{ github.run_number }}
         path: |
           tenable_was_scan.html
           scanner.log
+          tenable_was.conf

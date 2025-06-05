@@ -14,48 +14,49 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     
+    - name: 🧪 Test GoRest API Endpoint
+      run: |
+        echo "🔍 Testing GoRest API endpoint..."
+        response=$(curl -s https://gorest.co.in/public/v2/users)
+        if echo "$response" | jq length > /dev/null; then
+          echo "✅ GoRest API endpoint working"
+        else
+          echo "❌ GoRest API endpoint failed"
+        fi
+    
     - name: 🔍 Run API Auth Scan
       run: |
-        cat > tenable_was.conf << 'EOF'
-        "config_id"="api-auth-simple-test"
-        "template_id"="web-app-scan"
-        "results_visibility"=dashboard
-        "vulnerability_threshold"="Medium"
+        echo "🚀 Running API Authentication scan using config/api-key.conf..."
         
-        scan {
-          assessment { enable=true }
-          audit { headers=true jsons=true }
-          http { "request_timeout"=30 }
-          scope { "page_limit"=50 }
-          timeout="00:20:00"
-          
-          credentials {
-            "api_key" {
-              "auth_headers"={
-                "Authorization": "Bearer ${{ env.GOREST_API_TOKEN }}"
-                "Content-Type": "application/json"
-              }
-              "login_check"="users"
-              "login_check_url"="https://gorest.co.in/public/v2/users"
-            }
-          }
-        }
+        # Use the API key configuration file and replace token placeholder
+        cp config/api-key.conf tenable_was.conf
+        sed -i "s/\${GOREST_API_TOKEN}/${{ env.GOREST_API_TOKEN }}/g" tenable_was.conf
         
-        target="https://gorest.co.in/public/v2/"
-        EOF
+        echo "📋 Configuration file content:"
+        cat tenable_was.conf
         
+        # Run the scan
         docker run \
+          --name tenable-api-auth \
           -v $(pwd):/scanner \
           -e WAS_MODE=cicd \
           -e ACCESS_KEY="${{ env.TENABLE_ACCESS_KEY }}" \
           -e SECRET_KEY="${{ env.TENABLE_SECRET_KEY }}" \
+          -e GOREST_API_TOKEN="${{ env.GOREST_API_TOKEN }}" \
           tenable/was-scanner:latest || true
+        
+        # Show results
+        if [[ -f "scanner.log" ]]; then
+          echo "📋 Scanner log (last 30 lines):"
+          tail -30 scanner.log
+        fi
           
-    - name: 📤 Upload Results
+    - name: �� Upload Results
       uses: actions/upload-artifact@v4
       if: always()
       with:
-        name: api-auth-simple-results
+        name: api-auth-simple-results-${{ github.run_number }}
         path: |
           tenable_was_scan.html
           scanner.log
+          tenable_was.conf

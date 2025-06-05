@@ -13,58 +13,57 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     
-    - name: �� Deploy DVWA
+    - name: 🐳 Deploy DVWA
       run: |
+        echo "🚀 Deploying DVWA for form authentication testing..."
         docker run -d --name dvwa -p 8080:80 vulnerables/web-dvwa:latest
+        
+        # Wait for DVWA to start
         sleep 30
+        
+        # Setup DVWA database
         curl -X POST http://localhost:8080/setup.php -d "create_db=Create / Reset Database" || true
         sleep 10
+        
+        # Verify DVWA is accessible
+        if curl -s http://localhost:8080/login.php | grep -q "login"; then
+          echo "✅ DVWA deployed and accessible"
+        else
+          echo "❌ DVWA deployment failed"
+        fi
     
     - name: 🔍 Run Form Auth Scan
       run: |
-        cat > tenable_was.conf << 'EOF'
-        "config_id"="form-auth-simple-test"
-        "template_id"="web-app-scan"
-        "results_visibility"=dashboard
-        "vulnerability_threshold"="Medium"
+        echo "🚀 Running Form Authentication scan using config/dvwa-form-auth.conf..."
         
-        scan {
-          assessment { enable=true }
-          audit { forms=true cookies=true }
-          http { "request_timeout"=45 }
-          scope { "page_limit"=100 }
-          timeout="00:30:00"
-          
-          credentials {
-            "login_form" {
-              "login_url"="http://localhost:8080/login.php"
-              "login_parameters"={
-                "username": "admin"
-                "password": "password"
-                "Login": "Login"
-              }
-              "login_check"="Welcome"
-              "login_check_url"="http://localhost:8080/index.php"
-            }
-          }
-        }
+        # Use the DVWA-specific configuration file
+        cp config/dvwa-form-auth.conf tenable_was.conf
         
-        target="http://localhost:8080/"
-        EOF
+        echo "📋 Configuration file content:"
+        cat tenable_was.conf
         
+        # Run the scan
         docker run \
+          --name tenable-form-auth \
           -v $(pwd):/scanner \
           --network host \
           -e WAS_MODE=cicd \
           -e ACCESS_KEY="${{ env.TENABLE_ACCESS_KEY }}" \
           -e SECRET_KEY="${{ env.TENABLE_SECRET_KEY }}" \
           tenable/was-scanner:latest || true
+        
+        # Show results
+        if [[ -f "scanner.log" ]]; then
+          echo "📋 Scanner log (last 30 lines):"
+          tail -30 scanner.log
+        fi
           
     - name: 📤 Upload Results
       uses: actions/upload-artifact@v4
       if: always()
       with:
-        name: form-auth-simple-results
+        name: form-auth-simple-results-${{ github.run_number }}
         path: |
           tenable_was_scan.html
           scanner.log
+          tenable_was.conf

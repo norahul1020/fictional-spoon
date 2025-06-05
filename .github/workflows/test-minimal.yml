@@ -1,0 +1,52 @@
+name: 🧪 Minimal Test
+
+on:
+  workflow_dispatch:
+
+env:
+  TENABLE_ACCESS_KEY: ${{ secrets.TENABLE_ACCESS_KEY }}
+  TENABLE_SECRET_KEY: ${{ secrets.TENABLE_SECRET_KEY }}
+
+jobs:
+  minimal-test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: 🔍 Run Minimal Test Scan
+      run: |
+        echo "🚀 Running minimal test scan using config/minimal-test.conf..."
+        
+        # Use the minimal configuration file
+        cp config/minimal-test.conf tenable_was.conf
+        
+        echo "📋 Minimal configuration:"
+        cat tenable_was.conf
+        
+        # Run the scan
+        docker run \
+          --name tenable-minimal-test \
+          -v $(pwd):/scanner \
+          -e WAS_MODE=cicd \
+          -e ACCESS_KEY="${{ env.TENABLE_ACCESS_KEY }}" \
+          -e SECRET_KEY="${{ env.TENABLE_SECRET_KEY }}" \
+          tenable/was-scanner:latest || true
+        
+        # Show all generated files
+        echo "📁 Generated files:"
+        ls -la *.html *.log *.conf 2>/dev/null || echo "No scan files found"
+        
+        if [[ -f "scanner.log" ]]; then
+          echo "📋 Complete scanner log:"
+          cat scanner.log
+        fi
+          
+    - name: 📤 Upload Results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: minimal-test-results-${{ github.run_number }}
+        path: |
+          tenable_was_scan.html
+          scanner.log
+          tenable_was.conf

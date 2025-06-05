@@ -25,3 +25,8 @@ echo "$cookie_string"
 rm -f "$cookie_jar"
 
 echo "✅ Cookie generation complete!"
+echo ""
+echo "📝 To use this cookie in a config file:"
+echo "1. Edit config/cookie-auth.conf"
+echo "2. Update the cookie field with your generated cookie"
+echo "3. Run the cookie authentication workflow"

@@ -24,13 +24,12 @@ env:
   TENABLE_SECRET_KEY: ${{ secrets.TENABLE_SECRET_KEY }}
   VULNERABILITY_THRESHOLD: ${{ github.event.inputs.vulnerability_threshold || 'Medium' }}
   GOREST_API_TOKEN: ${{ secrets.GOREST_API_TOKEN || 'demo-token' }}
-  APP_USERNAME: ${{ secrets.APP_USERNAME || 'testuser' }}
-  APP_PASSWORD: ${{ secrets.APP_PASSWORD || 'testpass123' }}
 
 jobs:
   test-basic-authentication:
     name: 🔐 Basic Authentication Test
     runs-on: ubuntu-latest
+    if: contains(github.event.inputs.auth_methods || 'basic,digest,form,cookie,api_key,bearer', 'basic')
     
     steps:
     - name: 📥 Checkout
@@ -47,53 +46,18 @@ jobs:
           exit 1
         fi
         
-    - name: ⚙️ Prepare Basic Auth Configuration
-      run: |
-        cat > tenable_was.conf << 'CONF_EOF'
-        "config_id"="basic-auth-test-${{ github.run_number }}"
-        "template_id"="web-app-scan"
-        "results_visibility"=dashboard
-        "vulnerability_threshold"="${{ env.VULNERABILITY_THRESHOLD }}"
-        
-        scan {
-          assessment {
-            dictionary=limited
-            enable=true
-            fingerprinting=false
-          }
-          audit {
-            cookies=true
-            forms=true
-            headers=true
-            links=true
-          }
-          http {
-            "request_timeout"=30
-            "request_concurrency"=3
-          }
-          scope {
-            "exclude_binaries"=true
-            "page_limit"=100
-          }
-          timeout="00:30:00"
-          
-          credentials {
-            "basic_auth" {
-              "username"="testuser"
-              "password"="testpass123"
-            }
-          }
-        }
-        
-        target="https://httpbin.org/basic-auth/testuser/testpass123"
-        CONF_EOF
-        
     - name: 🔍 Run Basic Auth Scan
       run: |
-        echo "🚀 Running Basic Authentication scan..."
+        echo "🚀 Running Basic Authentication scan using config/basic-auth.conf..."
         
+        # Copy the configuration file
+        cp config/basic-auth.conf tenable_was.conf
+        
+        echo "📋 Using configuration:"
+        cat tenable_was.conf
+        
+        # Run the scan
         docker pull tenable/was-scanner:latest
-        
         docker run \
           --name tenable-basic-auth \
           -v $(pwd):/scanner \
@@ -102,9 +66,11 @@ jobs:
           -e SECRET_KEY="${{ env.TENABLE_SECRET_KEY }}" \
           tenable/was-scanner:latest || true
         
+        # Organize results
         mkdir -p results/basic-auth
         [[ -f tenable_was_scan.html ]] && cp tenable_was_scan.html results/basic-auth/
         [[ -f scanner.log ]] && cp scanner.log results/basic-auth/
+        [[ -f tenable_was.conf ]] && cp tenable_was.conf results/basic-auth/
         
     - name: 📤 Upload Results
       uses: actions/upload-artifact@v4
@@ -117,6 +83,7 @@ jobs:
   test-digest-authentication:
     name: 🔐 Digest Authentication Test
     runs-on: ubuntu-latest
+    if: contains(github.event.inputs.auth_methods || 'basic,digest,form,cookie,api_key,bearer', 'digest')
     
     steps:
     - name: 📥 Checkout
@@ -132,43 +99,17 @@ jobs:
           echo "❌ HTTPBin Digest Auth endpoint failed"
         fi
         
-    - name: ⚙️ Prepare Digest Auth Configuration
-      run: |
-        cat > tenable_was.conf << 'CONF_EOF'
-        "config_id"="digest-auth-test-${{ github.run_number }}"
-        "template_id"="web-app-scan"
-        "results_visibility"=dashboard
-        "vulnerability_threshold"="${{ env.VULNERABILITY_THRESHOLD }}"
-        
-        scan {
-          assessment {
-            dictionary=limited
-            enable=true
-          }
-          audit {
-            cookies=true
-            forms=true
-            headers=true
-          }
-          scope {
-            "page_limit"=100
-          }
-          timeout="00:30:00"
-          
-          credentials {
-            "digest_auth" {
-              "username"="testuser"
-              "password"="testpass123"
-              "realm"="auth"
-            }
-          }
-        }
-        
-        target="https://httpbin.org/digest-auth/auth/testuser/testpass123"
-        CONF_EOF
-        
     - name: 🔍 Run Digest Auth Scan
       run: |
+        echo "🚀 Running Digest Authentication scan using config/digest-auth.conf..."
+        
+        # Copy the configuration file
+        cp config/digest-auth.conf tenable_was.conf
+        
+        echo "📋 Using configuration:"
+        cat tenable_was.conf
+        
+        # Run the scan
         docker run \
           --name tenable-digest-auth \
           -v $(pwd):/scanner \
@@ -177,9 +118,11 @@ jobs:
           -e SECRET_KEY="${{ env.TENABLE_SECRET_KEY }}" \
           tenable/was-scanner:latest || true
         
+        # Organize results
         mkdir -p results/digest-auth
         [[ -f tenable_was_scan.html ]] && cp tenable_was_scan.html results/digest-auth/
         [[ -f scanner.log ]] && cp scanner.log results/digest-auth/
+        [[ -f tenable_was.conf ]] && cp tenable_was.conf results/digest-auth/
         
     - name: 📤 Upload Results
       uses: actions/upload-artifact@v4
@@ -191,6 +134,7 @@ jobs:
   test-form-authentication:
     name: 📝 Form Authentication Test
     runs-on: ubuntu-latest
+    if: contains(github.event.inputs.auth_methods || 'basic,digest,form,cookie,api_key,bearer', 'form')
     
     steps:
     - name: 📥 Checkout
@@ -276,60 +220,17 @@ jobs:
           echo "❌ Login app deployment failed"
         fi
         
-    - name: ⚙️ Prepare Form Auth Configuration
-      run: |
-        cat > tenable_was.conf << 'CONF_EOF'
-        "config_id"="form-auth-test-${{ github.run_number }}"
-        "template_id"="web-app-scan"
-        "results_visibility"=dashboard
-        "vulnerability_threshold"="${{ env.VULNERABILITY_THRESHOLD }}"
-        
-        scan {
-          assessment {
-            dictionary=limited
-            enable=true
-          }
-          audit {
-            cookies=true
-            forms=true
-            headers=true
-            links=true
-          }
-          http {
-            "request_timeout"=45
-            "request_concurrency"=2
-          }
-          scope {
-            "exclude_binaries"=true
-            "page_limit"=200
-            "exclude_path_patterns"=["logout"]
-          }
-          timeout="00:45:00"
-          
-          credentials {
-            "login_form" {
-              "login_url"="http://localhost:5000/login"
-              "login_parameters"={
-                "username": "testuser"
-                "password": "testpass123"
-              }
-              "login_check"="Dashboard"
-              "login_check_pattern"="Welcome.*Dashboard|secure area"
-              "login_check_url"="http://localhost:5000/dashboard"
-              "failure_check"="Login failed"
-              "failure_pattern"="[Ll]ogin.*[Ff]ailed|[Ii]nvalid.*[Cc]redentials"
-              "auth_headers"={
-                "Content-Type": "application/x-www-form-urlencoded"
-              }
-            }
-          }
-        }
-        
-        target="http://localhost:5000/"
-        CONF_EOF
-        
     - name: 🔍 Run Form Auth Scan
       run: |
+        echo "🚀 Running Form Authentication scan using config/form-auth.conf..."
+        
+        # Copy the configuration file
+        cp config/form-auth.conf tenable_was.conf
+        
+        echo "📋 Using configuration:"
+        cat tenable_was.conf
+        
+        # Run the scan
         docker run \
           --name tenable-form-auth \
           -v $(pwd):/scanner \
@@ -339,9 +240,11 @@ jobs:
           -e SECRET_KEY="${{ env.TENABLE_SECRET_KEY }}" \
           tenable/was-scanner:latest || true
         
+        # Organize results
         mkdir -p results/form-auth
         [[ -f tenable_was_scan.html ]] && cp tenable_was_scan.html results/form-auth/
         [[ -f scanner.log ]] && cp scanner.log results/form-auth/
+        [[ -f tenable_was.conf ]] && cp tenable_was.conf results/form-auth/
         
     - name: 📤 Upload Results
       uses: actions/upload-artifact@v4
@@ -350,165 +253,10 @@ jobs:
         name: form-auth-results-${{ github.run_number }}
         path: results/form-auth/
 
-  test-api-authentication:
-    name: 🔑 API Authentication Test
-    runs-on: ubuntu-latest
-    
-    steps:
-    - name: 📥 Checkout
-      uses: actions/checkout@v4
-      
-    - name: 🧪 Test Public API Endpoints
-      run: |
-        echo "🔍 Testing public API endpoints..."
-        
-        # Test GoRest public endpoint
-        response=$(curl -s https://gorest.co.in/public/v2/users)
-        if echo "$response" | jq length > /dev/null; then
-          echo "✅ GoRest API endpoint working"
-        else
-          echo "❌ GoRest API endpoint failed"
-        fi
-        
-    - name: ⚙️ Prepare API Auth Configuration
-      run: |
-        cat > tenable_was.conf << 'CONF_EOF'
-        "config_id"="api-auth-test-${{ github.run_number }}"
-        "template_id"="web-app-scan"
-        "results_visibility"=dashboard
-        "vulnerability_threshold"="${{ env.VULNERABILITY_THRESHOLD }}"
-        
-        scan {
-          assessment {
-            dictionary=limited
-            enable=true
-          }
-          audit {
-            headers=true
-            jsons=true
-            links=true
-          }
-          http {
-            "request_timeout"=30
-            "request_headers" {
-              "Accept": "application/json"
-              "Content-Type": "application/json"
-            }
-          }
-          scope {
-            "exclude_binaries"=true
-            "page_limit"=50
-          }
-          timeout="00:30:00"
-          
-          credentials {
-            "api_key" {
-              "auth_headers"={
-                "Authorization": "Bearer ${{ env.GOREST_API_TOKEN }}"
-                "Content-Type": "application/json"
-                "Accept": "application/json"
-              }
-              "login_check"="users"
-              "login_check_pattern"="id.*name.*email"
-              "login_check_url"="https://gorest.co.in/public/v2/users"
-            }
-          }
-        }
-        
-        target="https://gorest.co.in/public/v2/"
-        CONF_EOF
-        
-    - name: 🔍 Run API Auth Scan
-      run: |
-        docker run \
-          --name tenable-api-auth \
-          -v $(pwd):/scanner \
-          -e WAS_MODE=cicd \
-          -e ACCESS_KEY="${{ env.TENABLE_ACCESS_KEY }}" \
-          -e SECRET_KEY="${{ env.TENABLE_SECRET_KEY }}" \
-          tenable/was-scanner:latest || true
-        
-        mkdir -p results/api-auth
-        [[ -f tenable_was_scan.html ]] && cp tenable_was_scan.html results/api-auth/
-        [[ -f scanner.log ]] && cp scanner.log results/api-auth/
-        
-    - name: 📤 Upload Results
-      uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: api-auth-results-${{ github.run_number }}
-        path: results/api-auth/
-
-  test-bearer-token-authentication:
-    name: 🎫 Bearer Token Test
-    runs-on: ubuntu-latest
-    
-    steps:
-    - name: 📥 Checkout
-      uses: actions/checkout@v4
-      
-    - name: ⚙️ Prepare Bearer Token Configuration
-      run: |
-        cat > tenable_was.conf << 'CONF_EOF'
-        "config_id"="bearer-token-test-${{ github.run_number }}"
-        "template_id"="web-app-scan"
-        "results_visibility"=dashboard
-        "vulnerability_threshold"="${{ env.VULNERABILITY_THRESHOLD }}"
-        
-        scan {
-          assessment {
-            dictionary=limited
-            enable=true
-          }
-          audit {
-            headers=true
-            jsons=true
-          }
-          scope {
-            "page_limit"=50
-          }
-          timeout="00:30:00"
-          
-          credentials {
-            "bearer_auth" {
-              "auth_headers"={
-                "Authorization": "Bearer test-token-123"
-                "Content-Type": "application/json"
-              }
-              "login_check"="bearer"
-              "login_check_pattern"="authenticated|token|bearer"
-              "login_check_url"="https://httpbin.org/bearer"
-            }
-          }
-        }
-        
-        target="https://httpbin.org/bearer"
-        CONF_EOF
-        
-    - name: 🔍 Run Bearer Token Scan
-      run: |
-        docker run \
-          --name tenable-bearer-token \
-          -v $(pwd):/scanner \
-          -e WAS_MODE=cicd \
-          -e ACCESS_KEY="${{ env.TENABLE_ACCESS_KEY }}" \
-          -e SECRET_KEY="${{ env.TENABLE_SECRET_KEY }}" \
-          tenable/was-scanner:latest || true
-        
-        mkdir -p results/bearer-token
-        [[ -f tenable_was_scan.html ]] && cp tenable_was_scan.html results/bearer-token/
-        [[ -f scanner.log ]] && cp scanner.log results/bearer-token/
-        
-    - name: 📤 Upload Results
-      uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: bearer-token-results-${{ github.run_number }}
-        path: results/bearer-token/
-
   test-cookie-authentication:
     name: 🍪 Cookie Authentication Test
     runs-on: ubuntu-latest
+    if: contains(github.event.inputs.auth_methods || 'basic,digest,form,cookie,api_key,bearer', 'cookie')
     
     steps:
     - name: 📥 Checkout
@@ -530,43 +278,17 @@ jobs:
           echo "❌ HTTPBin Cookie endpoint failed"
         fi
         
-    - name: ⚙️ Prepare Cookie Auth Configuration
-      run: |
-        cat > tenable_was.conf << 'CONF_EOF'
-        "config_id"="cookie-auth-test-${{ github.run_number }}"
-        "template_id"="web-app-scan"
-        "results_visibility"=dashboard
-        "vulnerability_threshold"="${{ env.VULNERABILITY_THRESHOLD }}"
-        
-        scan {
-          assessment {
-            dictionary=limited
-            enable=true
-          }
-          audit {
-            cookies=true
-            headers=true
-          }
-          scope {
-            "page_limit"=50
-          }
-          timeout="00:30:00"
-          
-          credentials {
-            "cookie_auth" {
-              "cookie"="test-session=authenticated-user; Path=/; Domain=httpbin.org"
-              "login_check"="cookies"
-              "login_check_pattern"="test-session"
-              "login_check_url"="https://httpbin.org/cookies"
-            }
-          }
-        }
-        
-        target="https://httpbin.org/cookies"
-        CONF_EOF
-        
     - name: 🔍 Run Cookie Auth Scan
       run: |
+        echo "🚀 Running Cookie Authentication scan using config/cookie-auth.conf..."
+        
+        # Copy the configuration file
+        cp config/cookie-auth.conf tenable_was.conf
+        
+        echo "📋 Using configuration:"
+        cat tenable_was.conf
+        
+        # Run the scan
         docker run \
           --name tenable-cookie-auth \
           -v $(pwd):/scanner \
@@ -575,9 +297,11 @@ jobs:
           -e SECRET_KEY="${{ env.TENABLE_SECRET_KEY }}" \
           tenable/was-scanner:latest || true
         
+        # Organize results
         mkdir -p results/cookie-auth
         [[ -f tenable_was_scan.html ]] && cp tenable_was_scan.html results/cookie-auth/
         [[ -f scanner.log ]] && cp scanner.log results/cookie-auth/
+        [[ -f tenable_was.conf ]] && cp tenable_was.conf results/cookie-auth/
         
     - name: 📤 Upload Results
       uses: actions/upload-artifact@v4
@@ -585,6 +309,104 @@ jobs:
       with:
         name: cookie-auth-results-${{ github.run_number }}
         path: results/cookie-auth/
+
+  test-api-authentication:
+    name: 🔑 API Authentication Test
+    runs-on: ubuntu-latest
+    if: contains(github.event.inputs.auth_methods || 'basic,digest,form,cookie,api_key,bearer', 'api_key')
+    
+    steps:
+    - name: �� Checkout
+      uses: actions/checkout@v4
+      
+    - name: 🧪 Test Public API Endpoints
+      run: |
+        echo "🔍 Testing public API endpoints..."
+        
+        # Test GoRest public endpoint
+        response=$(curl -s https://gorest.co.in/public/v2/users)
+        if echo "$response" | jq length > /dev/null; then
+          echo "✅ GoRest API endpoint working"
+        else
+          echo "❌ GoRest API endpoint failed"
+        fi
+        
+    - name: 🔍 Run API Auth Scan
+      run: |
+        echo "🚀 Running API Authentication scan using config/api-key.conf..."
+        
+        # Copy and process the configuration file
+        cp config/api-key.conf tenable_was.conf
+        
+        # Replace the GOREST_API_TOKEN placeholder
+        sed -i "s/\${GOREST_API_TOKEN}/${{ env.GOREST_API_TOKEN }}/g" tenable_was.conf
+        
+        echo "📋 Using configuration:"
+        cat tenable_was.conf
+        
+        # Run the scan
+        docker run \
+          --name tenable-api-auth \
+          -v $(pwd):/scanner \
+          -e WAS_MODE=cicd \
+          -e ACCESS_KEY="${{ env.TENABLE_ACCESS_KEY }}" \
+          -e SECRET_KEY="${{ env.TENABLE_SECRET_KEY }}" \
+          -e GOREST_API_TOKEN="${{ env.GOREST_API_TOKEN }}" \
+          tenable/was-scanner:latest || true
+        
+        # Organize results
+        mkdir -p results/api-auth
+        [[ -f tenable_was_scan.html ]] && cp tenable_was_scan.html results/api-auth/
+        [[ -f scanner.log ]] && cp scanner.log results/api-auth/
+        [[ -f tenable_was.conf ]] && cp tenable_was.conf results/api-auth/
+        
+    - name: 📤 Upload Results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: api-auth-results-${{ github.run_number }}
+        path: results/api-auth/
+
+  test-bearer-token-authentication:
+    name: 🎫 Bearer Token Test
+    runs-on: ubuntu-latest
+    if: contains(github.event.inputs.auth_methods || 'basic,digest,form,cookie,api_key,bearer', 'bearer')
+    
+    steps:
+    - name: �� Checkout
+      uses: actions/checkout@v4
+      
+    - name: 🔍 Run Bearer Token Scan
+      run: |
+        echo "🚀 Running Bearer Token Authentication scan using config/bearer-token.conf..."
+        
+        # Copy the configuration file
+        cp config/bearer-token.conf tenable_was.conf
+        
+        echo "📋 Using configuration:"
+        cat tenable_was.conf
+        
+        # Run the scan
+        docker run \
+          --name tenable-bearer-token \
+          -v $(pwd):/scanner \
+          -e WAS_MODE=cicd \
+          -e ACCESS_KEY="${{ env.TENABLE_ACCESS_KEY }}" \
+          -e SECRET_KEY="${{ env.TENABLE_SECRET_KEY }}" \
+          tenable/was-scanner:latest || true
+        
+        # Organize results
+        mkdir -p results/bearer-token
+        [[ -f tenable_was_scan.html ]] && cp tenable_was_scan.html results/bearer-token/
+        [[ -f scanner.log ]] && cp scanner.log results/bearer-token/
+        [[ -f tenable_was.conf ]] && cp tenable_was.conf results/bearer-token/
+        
+    - name: 📤 Upload Results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: bearer-token-results-${{ github.run_number }}
+        path: results/bearer-token/
 
   summary-report:
     name: 📊 Generate Summary Report
@@ -605,6 +427,7 @@ jobs:
         echo "**Test Run:** ${{ github.run_number }}" >> SUMMARY.md
         echo "**Date:** $(date -u)" >> SUMMARY.md
         echo "**Repository:** ${{ github.repository }}" >> SUMMARY.md
+        echo "**Configuration Files Used:** Separate .conf files from config/ directory" >> SUMMARY.md
         echo "" >> SUMMARY.md
         
         echo "## 📋 Test Results" >> SUMMARY.md
@@ -623,12 +446,29 @@ jobs:
             if [[ -f "all-results/${auth_type}-results-${{ github.run_number }}/scanner.log" ]]; then
               echo "   - 📋 Scanner Log: Available" >> SUMMARY.md
             fi
+            
+            # Check if config was used
+            if [[ -f "all-results/${auth_type}-results-${{ github.run_number }}/tenable_was.conf" ]]; then
+              echo "   - ⚙️ Configuration: Available" >> SUMMARY.md
+            fi
           else
             echo "❌ **${auth_type}**: Failed or Skipped" >> SUMMARY.md
           fi
           echo "" >> SUMMARY.md
         done
         
+        echo "## 📄 Configuration Files" >> SUMMARY.md
+        echo "" >> SUMMARY.md
+        echo "All authentication methods use separate configuration files:" >> SUMMARY.md
+        echo "- \`config/basic-auth.conf\` - Basic Authentication" >> SUMMARY.md
+        echo "- \`config/digest-auth.conf\` - Digest Authentication" >> SUMMARY.md
+        echo "- \`config/form-auth.conf\` - Form Authentication" >> SUMMARY.md
+        echo "- \`config/cookie-auth.conf\` - Cookie Authentication" >> SUMMARY.md
+        echo "- \`config/api-key.conf\` - API Key Authentication" >> SUMMARY.md
+        echo "- \`config/bearer-token.conf\` - Bearer Token Authentication" >> SUMMARY.md
+        echo "- \`config/dvwa-form-auth.conf\` - DVWA Form Authentication" >> SUMMARY.md
+        echo "- \`config/minimal-test.conf\` - Minimal Test Configuration" >> SUMMARY.md
+        echo "" >> SUMMARY.md
         echo "## 📄 Reports Available" >> SUMMARY.md
         echo "" >> SUMMARY.md
         echo "All scan reports are available in the GitHub Actions artifacts." >> SUMMARY.md

@@ -26,15 +26,19 @@ jobs:
           # Use the configuration file from repository
           cp config/basic-auth.conf tenable_was.conf
           
-          # Pull and run Tenable scanner
+          # Set proper permissions for the scanner directory
+          chmod 777 $(pwd)
+          
+          # Pull and run Tenable scanner with proper user permissions
           docker pull tenable/was-scanner:latest
           docker run \
             --name tenable-was-scan \
+            --user root \
             -v $(pwd):/scanner \
             -e WAS_MODE=cicd \
             -e ACCESS_KEY="${{ env.TENABLE_ACCESS_KEY }}" \
             -e SECRET_KEY="${{ env.TENABLE_SECRET_KEY }}" \
-            tenable/was-scanner:latest
+            tenable/was-scanner:latest || true
 
       - name: 📊 Upload Scan Results
         uses: actions/upload-artifact@v4

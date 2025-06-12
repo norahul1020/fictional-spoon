@@ -2,9 +2,9 @@ name: 🔐 Tenable Basic Auth Scan
 on: 
   workflow_dispatch:
   push:
-    branches: [ main, staging ]
+    branches: [ master, staging ]
   pull_request:
-    branches: [ main ]
+    branches: [ master ]
 
 env:
   TENABLE_ACCESS_KEY: ${{ secrets.TENABLE_ACCESS_KEY }}

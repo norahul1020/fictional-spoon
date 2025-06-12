@@ -1,66 +1,62 @@
-name: 🔐 Basic Auth Test Only
-
-on:
+name: 🔐 Tenable Basic Auth Scan
+on: 
   workflow_dispatch:
+  push:
+    branches: [ main, staging ]
+  pull_request:
+    branches: [ main ]
 
 env:
   TENABLE_ACCESS_KEY: ${{ secrets.TENABLE_ACCESS_KEY }}
   TENABLE_SECRET_KEY: ${{ secrets.TENABLE_SECRET_KEY }}
 
 jobs:
-  basic-auth-test:
+  tenable-scan:
     runs-on: ubuntu-latest
+    name: 🛡️ Tenable WAS Security Scan
+    
     steps:
-    - uses: actions/checkout@v4
-    
-    - name: 🧪 Test HTTPBin Basic Auth Endpoint
-      run: |
-        echo "🔍 Testing HTTPBin Basic Auth endpoint..."
-        response=$(curl -s -u testuser:testpass123 https://httpbin.org/basic-auth/testuser/testpass123)
-        if echo "$response" | jq -r '.authenticated' | grep -q "true"; then
-          echo "✅ HTTPBin Basic Auth endpoint working"
-        else
-          echo "❌ HTTPBin Basic Auth endpoint failed"
-          exit 1
-        fi
-    
-    - name: 🔍 Run Basic Auth Scan
-      run: |
-        echo "🚀 Running Basic Authentication scan using config/basic-auth.conf..."
-        
-        # Use the separate configuration file
-        cp config/basic-auth.conf tenable_was.conf
-        
-        echo "📋 Configuration file content:"
-        cat tenable_was.conf
-        
-        # Run the scan
-        docker pull tenable/was-scanner:latest
-        docker run \
-          --name tenable-basic-auth \
-          -v $(pwd):/scanner \
-          -e WAS_MODE=cicd \
-          -e ACCESS_KEY="${{ env.TENABLE_ACCESS_KEY }}" \
-          -e SECRET_KEY="${{ env.TENABLE_SECRET_KEY }}" \
-          tenable/was-scanner:latest || true
-        
-        # Show results
-        if [[ -f "tenable_was_scan.html" ]]; then
-          echo "✅ Scan completed - HTML report generated"
-          ls -la tenable_was_scan.html
-        fi
-        
-        if [[ -f "scanner.log" ]]; then
-          echo "📋 Scanner log (last 30 lines):"
-          tail -30 scanner.log
-        fi
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 🛡️ Run Tenable WAS Scan
+        run: |
+          echo "🚀 Starting Tenable Web Application Security Scan..."
           
-    - name: 📤 Upload Results
-      uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: basic-auth-simple-results-${{ github.run_number }}
-        path: |
-          tenable_was_scan.html
-          scanner.log
-          tenable_was.conf
+          # Use the configuration file from repository
+          cp config/basic-auth.conf tenable_was.conf
+          
+          # Pull and run Tenable scanner
+          docker pull tenable/was-scanner:latest
+          docker run \
+            --name tenable-was-scan \
+            -v $(pwd):/scanner \
+            -e WAS_MODE=cicd \
+            -e ACCESS_KEY="${{ env.TENABLE_ACCESS_KEY }}" \
+            -e SECRET_KEY="${{ env.TENABLE_SECRET_KEY }}" \
+            tenable/was-scanner:latest
+
+      - name: 📊 Upload Scan Results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: tenable-scan-results-${{ github.run_number }}
+          path: |
+            tenable_was_scan.html
+            scanner.log
+            tenable_was.conf
+          retention-days: 30
+
+      - name: ✅ Scan Complete
+        if: success()
+        run: echo "🎉 Tenable security scan completed successfully!"
+        
+      - name: ❌ Scan Failed
+        if: failure()
+        run: |
+          echo "❌ Tenable security scan failed!"
+          if [[ -f "scanner.log" ]]; then
+            echo "📋 Last 20 lines of scanner log:"
+            tail -20 scanner.log
+          fi
+          exit 1
